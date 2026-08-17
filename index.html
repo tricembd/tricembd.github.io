@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MBD-BOOK</title>
+  <style>
+    body {
+      user-select: none;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: url('https://raw.githubusercontent.com/tricembd/tricembd.github.io/main/photo.png') center center fixed;
+      background-size: cover;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      color: #fff;
+      touch-action: none;
+    }
+
+    #clock {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      z-index: 2000;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      pointer-events: none;
+      color: white;
+    }
+
+    .liquid-glass {
+      --scale-factor: 1.0;
+      --pos-x: 0px;
+      --pos-y: 0px;
+      width: 273px;
+      min-height: 310px;
+      padding: 33px;
+      border-radius: 28px;
+      isolation: isolate;
+      position: relative;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      cursor: grab;
+      touch-action: none;
+      transition: box-shadow 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      box-sizing: border-box;
+      will-change: transform;
+      transform: translate(var(--pos-x), var(--pos-y)) scale(var(--scale-factor));
+    }
+
+    .liquid-glass.dragging {
+      cursor: grabbing;
+      z-index: 1000;
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .liquid-glass::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background-color: rgba(255, 255, 255, 0.03);
+      background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 50%);
+      pointer-events: none;
+    }
+
+    .liquid-glass::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      border-radius: 28px;
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      filter: url(#liquid-glass-distortion);
+      -webkit-filter: url(#liquid-glass-distortion);
+      pointer-events: none;
+    }
+
+    .profile-card-content { position: relative; z-index: 1; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; text-align: center; }
+    .support-text { font-size: 0.75rem; margin-bottom: 12px; line-height: 1.3; opacity: 0.9; margin-top: 10px; }
+    .controls { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-bottom: 10px; }
+    button { padding: 8px 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.15); color: white; font-weight: 600; font-size: 0.8rem; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.3); transition: background 0.2s ease, transform 0.2s ease; backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; width: 100%; }
+    button:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.02); }
+    button:disabled { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.4); border-color: rgba(255, 255, 255, 0.1); cursor: not-allowed; transform: none; }
+    .zoom-controls { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 4px; }
+    .zoom-btn { width: 28px; height: 28px; border-radius: 50%; font-size: 1.1rem; padding: 0; }
+    
+    .progress-wrap { 
+      width: 100%; 
+      background: rgba(255, 255, 255, 0.1); 
+      border-radius: 8px; 
+      margin-bottom: 10px; 
+      height: 6px; 
+      overflow: hidden; 
+      display: none; 
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    .progress-wrap.active { display: block; }
+    
+    .progress-bar { 
+      width: 0%; 
+      height: 100%; 
+      background: rgba(255, 255, 255, 0.9); 
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5);
+      border-radius: 6px;
+      transition: width 0.3s ease-out;
+      position: relative;
+    }
+    
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+      animation: glow-move 1.5s infinite linear;
+    }
+
+    @keyframes glow-move {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: rgba(0, 0, 0, 0.8); color: #fff; padding: 10px 20px; border-radius: 8px; transition: transform 0.3s ease; z-index: 1000; font-size: 0.9rem; border: 1px solid rgba(255, 255, 255, 0.2); }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    #downloadCount { font-size: 0.7rem; text-align: center; margin-top: 8px; opacity: 0.85; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+    .global-reset { 
+      position: fixed; 
+      bottom: 20px; 
+      left: 20px; 
+      padding: 6px 12px; 
+      background: rgba(255, 255, 255, 0.15); 
+      backdrop-filter: blur(10px); 
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3); 
+      border-radius: 10px; 
+      color: white; 
+      font-size: 0.75rem; 
+      font-weight: 600; 
+      cursor: pointer; 
+      z-index: 1000; 
+      max-width: calc(100vw - 40px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 480px) {
+      #clock { top: 10px; right: 10px; font-size: 0.7rem; padding: 4px 8px; }
+      .global-reset { bottom: 10px; left: 10px; font-size: 0.7rem; padding: 4px 8px; }
+      .liquid-glass { width: 240px; min-height: 280px; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <svg width="0" height="0" style="position:absolute"><defs><filter id="liquid-glass-distortion" x="0%" y="0%" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.012" numOctaves="2" seed="92" result="noise" /><feGaussianBlur in="noise" stdDeviation="2" result="blurred" /><feDisplacementMap in="SourceGraphic" in2="blurred" scale="85" xChannelSelector="R" yChannelSelector="G" /></filter></defs></svg>
+
+  <div id="clock">00:00</div>
+  <div id="glass-card" class="liquid-glass">
+    <div class="profile-card-content">
+      <p class="support-text">Распространяйте книгу и делитесь ею - так вы поддерживаете автора</p>
+      <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="controls">
+        <button id="downloadBtn">Завладеть книгой</button>
+        <button id="shareBtn">Поделиться</button>
+      </div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="zoom-out">-</button>
+        <button class="zoom-btn" id="zoom-in">+</button>
+      </div>
+      <div id="downloadCount">Скачиваний: загрузка...</div>
+    </div>
+  </div>
+
+  <button id="global-reset" class="global-reset">Сбросить вид</button>
+  <div id="toast" class="toast"></div>
+
+<script>
+    (function() {
+      'use strict';
+      
+      const card = document.getElementById('glass-card');
+      const downloadCountEl = document.getElementById('downloadCount');
+      const progressWrap = document.getElementById('progressWrap');
+      const progressBar = document.getElementById('progressBar');
+      const toast = document.getElementById('toast');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const shareBtn = document.getElementById('shareBtn');
+      
+      const BIN_ID = '6a832e1fda38895dfeef4161';
+      const API_KEY = '$2a$10$62hvsPCaXPM84HNxUxleTOg/13GQvBx.5Vmo6JXDo1cma83WuCxYy';
+      const PDF_URL = 'https://raw.githubusercontent.com/tricembd/tricembd.github.io/main/Untitled%20document.pdf';
+
+      function getInitialScale() {
+        return 1.0;
+      }
+
+      async function incrementCounter() {
+        try {
+          const getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { 
+            headers: { 'X-Master-Key': API_KEY } 
+          });
+          const data = await getRes.json();
+          const newCount = (data.record.totalDownloads || 0) + 1;
+
+          await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { 
+            method: 'PUT', 
+            headers: { 
+              'Content-Type': 'application/json', 
+              'X-Master-Key': API_KEY 
+            }, 
+            body: JSON.stringify({ totalDownloads: newCount }) 
+          });
+          
+          return newCount;
+        } catch (e) { 
+          console.error("Counter update failed", e); 
+          return null; 
+        }
+      }
+
+      function showToast(msg) { 
+        toast.textContent = msg; 
+        toast.classList.add('show'); 
+        setTimeout(() => toast.classList.remove('show'), 2000); 
+      }
+
+      fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY }})
+        .then(r => r.json()).then(d => downloadCountEl.textContent = `Скачиваний: ${d.record.totalDownloads || 0} раз`)
+        .catch(() => downloadCountEl.textContent = 'Счётчик временно недоступен');
+
+      if (localStorage.getItem('bookDownloaded')) { 
+        downloadBtn.textContent = 'Уже загружено!'; 
+        downloadBtn.disabled = true; 
+      }
+
+      let isDragging = false, startX, startY, posX = 0, posY = 0;
+
+      function updateCardTransform() {
+        card.style.setProperty('--pos-x', `${posX}px`);
+        card.style.setProperty('--pos-y', `${posY}px`);
+        card.style.setProperty('--scale-factor', scaleFactor);
+      }
+
+      function startDrag(clientX, clientY, target) {
+        if (target.tagName === 'BUTTON') return;
+        isDragging = true;
+        card.classList.add('dragging');
+        startX = clientX - posX;
+        startY = clientY - posY;
+      }
+
+      function onDrag(clientX, clientY) {
+        if (!isDragging) return;
+        posX = clientX - startX;
+        posY = clientY - startY;
+        updateCardTransform();
+      }
+
+      function endDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        card.classList.remove('dragging');
+      }
+
+      card.addEventListener('pointerdown', (e) => {
+        card.setPointerCapture(e.pointerId);
+        startDrag(e.clientX, e.clientY, e.target);
+      });
+
+      card.addEventListener('pointermove', (e) => {
+        onDrag(e.clientX, e.clientY);
+      });
+
+      card.addEventListener('pointerup', (e) => {
+        try { card.releasePointerCapture(e.pointerId); } catch(err) {}
+        endDrag();
+      });
+
+      card.addEventListener('pointercancel', (e) => {
+        try { card.releasePointerCapture(e.pointerId); } catch(err) {}
+        endDrag();
+      });
+
+      let scaleFactor = getInitialScale();
+      updateCardTransform();
+
+      document.getElementById('zoom-in').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (scaleFactor < 1.3) {
+          scaleFactor = Math.min(1.3, Math.round((scaleFactor + 0.1) * 10) / 10);
+          updateCardTransform();
+        }
+      });
+
+      document.getElementById('zoom-out').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (scaleFactor > 0.7) {
+          scaleFactor = Math.max(0.7, Math.round((scaleFactor - 0.1) * 10) / 10);
+          updateCardTransform();
+        }
+      });
+
+      document.getElementById('global-reset').addEventListener('click', () => {
+        posX = 0; 
+        posY = 0; 
+        scaleFactor = 1.0;
+        updateCardTransform();
+      });
+
+      downloadBtn.addEventListener('click', async () => {
+        downloadBtn.disabled = true; 
+        downloadBtn.textContent = 'Загрузка...'; 
+        progressWrap.classList.add('active');
+        
+        try {
+          const response = await fetch(PDF_URL);
+          const reader = response.body.getReader();
+          const contentLength = +response.headers.get('Content-Length');
+          let received = 0, chunks = [];
+          
+          while(true) {
+            const {done, value} = await reader.read();
+            if(done) break;
+            chunks.push(value); 
+            received += value.length;
+            progressBar.style.width = contentLength ? (received / contentLength * 100) + '%' : '90%';
+          }
+          
+          const newCount = await incrementCounter();
+          const blob = new Blob(chunks, { type: 'application/pdf' });
+          const a = document.createElement('a'); 
+          a.href = URL.createObjectURL(blob); 
+          a.download = 'Книга.pdf'; 
+          a.click();
+          
+          localStorage.setItem('bookDownloaded', 'true');
+          downloadBtn.textContent = 'Уже загружено!';
+          if(newCount !== null) downloadCountEl.textContent = `Скачиваний: ${newCount} раз`;
+          showToast('Готово!');
+        } catch(err) { 
+          console.error(err);
+          showToast('Ошибка загрузки'); 
+          downloadBtn.disabled = false; 
+          downloadBtn.textContent = 'Завладеть книгой'; 
+        } finally { 
+          progressWrap.classList.remove('active'); 
+        }
+      });
+      
+      shareBtn.addEventListener('click', () => { 
+        if (navigator.share) {
+          navigator.share({ 
+            title: document.title,
+            url: window.location.href 
+          }).catch(() => {}); 
+        } else { 
+          navigator.clipboard.writeText(window.location.href).then(() => {
+            showToast('Ссылка скопирована!');
+          }).catch(() => {
+            showToast('Не удалось скопировать');
+          });
+        } 
+      });
+      
+      setInterval(() => { 
+        const n = new Date(); 
+        document.getElementById('clock').textContent = n.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); 
+      }, 1000);
+    })();
+</script>
+</body>
+</html>
